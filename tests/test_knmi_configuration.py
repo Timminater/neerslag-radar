@@ -15,6 +15,7 @@ def test_all_knmi_key_forms_link_to_token_page() -> None:
         )
         steps = translations["config_subentries"]["provider"]["step"]
         for step_name in ("knmi", "reconfigure"):
-            assert TOKEN_URL in steps[step_name]["data_description"]["api_key"]
+            assert "{knmi_token_url}" in steps[step_name]["data_description"]["api_key"]
             assert "use_anonymous_api_key" in steps[step_name]["data"]
             assert "use_anonymous_api_key" in steps[step_name]["data_description"]
+    assert TOKEN_URL in (integration / "config_flow.py").read_text(encoding="utf-8")

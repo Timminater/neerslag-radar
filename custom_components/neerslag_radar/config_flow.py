@@ -52,6 +52,8 @@ from .providers.base import (
     ProviderDataError,
 )
 
+KNMI_TOKEN_URL = "https://developer.dataplatform.knmi.nl/open-data-api#token"
+
 
 class PrecipitationForecastConfigFlow(ConfigFlow, domain=DOMAIN):
     """Configure a fixed forecast location."""
@@ -260,7 +262,14 @@ class ProviderSubentryFlow(ConfigSubentryFlow):
             fields[vol.Optional(CONF_API_KEY, default=defaults.get(CONF_API_KEY, ""))] = (
                 TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
             )
-        return self.async_show_form(step_id=step_id, data_schema=vol.Schema(fields), errors=errors)
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"knmi_token_url": KNMI_TOKEN_URL}
+            if provider_type is ProviderType.KNMI
+            else None,
+        )
 
     async def _async_validate_provider(
         self, provider_type: ProviderType, provider_data: dict[str, Any]
