@@ -113,7 +113,9 @@ jobs:
             exit 0
           fi
 
+          tag_exists=false
           if git rev-parse --verify --quiet "refs/tags/$VERSION" >/dev/null; then
+            tag_exists=true
             tag_commit="$(git rev-list -n 1 "$VERSION")"
             if [[ "$tag_commit" != "$TARGET" ]]; then
               echo "Tag $VERSION points to $tag_commit instead of $TARGET." >&2
@@ -124,10 +126,12 @@ jobs:
           release_args=(
             "$VERSION"
             --repo "$GITHUB_REPOSITORY"
-            --target "$TARGET"
             --title "$VERSION"
             --generate-notes
           )
+          if [[ "$tag_exists" == false ]]; then
+            release_args+=(--target "$TARGET")
+          fi
           if [[ "$VERSION" == *-* ]]; then
             release_args+=(--prerelease)
           fi
