@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..const import ProviderType
+from ..const import CONF_API_KEY, CONF_USE_ANONYMOUS_API_KEY, ProviderType
 from .base import PrecipitationProvider
 from .buienalarm import BuienalarmProvider
 from .buienradar import BuienradarProvider
@@ -37,7 +37,8 @@ def create_provider(
             session,
             latitude,
             longitude,
-            api_key=str(data.get("api_key", "")),
+            api_key=str(data.get(CONF_API_KEY, "")),
+            use_anonymous_api_key=bool(data.get(CONF_USE_ANONYMOUS_API_KEY, False)),
             cache=knmi_cache,
         )
     raise ValueError(f"Unsupported provider: {provider_type}")

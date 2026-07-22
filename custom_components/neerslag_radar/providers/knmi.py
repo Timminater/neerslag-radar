@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import os
+import re
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -18,7 +18,6 @@ from .base import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderDataError,
-    ProviderDependencyError,
 )
 from .http import async_get
 
@@ -26,20 +25,43 @@ DATASET = "seamless_precipitation_ensemble_forecast_members"
 VERSION = "1.0"
 BASE_URL = f"https://api.dataplatform.knmi.nl/open-data/v1/datasets/{DATASET}/versions/{VERSION}/files"
 MAX_FILE_SIZE = 750_000_000
-OPTIONAL_DEPENDENCIES = ("netCDF4", "numpy", "pyproj")
+KNMI_ANONYMOUS_API_KEY = (
+    "eyJvcmciOiI1ZTU1NGUxOTI3NGE5NjAwMDEyYTNlYjEiLCJpZCI6IjUzYTg1ZDBhMmQ5YzRkYzJi"
+    "YWNlNzQ4NTQ2Zjk4ODExIiwiaCI6Im11cm11cjEyOCJ9"
+)
 
 
-def knmi_dependencies_available() -> bool:
-    """Return whether the optional KNMI parsing libraries can be imported."""
-    return all(importlib.util.find_spec(module) is not None for module in OPTIONAL_DEPENDENCIES)
+def _select_api_key(api_key: str, use_anonymous_api_key: bool) -> str:
+    """Select either the user-owned key or KNMI's published shared test key."""
+    return KNMI_ANONYMOUS_API_KEY if use_anonymous_api_key else api_key.strip()
 
 
-def _require_knmi_dependencies() -> None:
-    """Fail before downloading a forecast when KNMI parsing is unavailable."""
-    if not knmi_dependencies_available():
-        raise ProviderDependencyError(
-            "KNMI requires optional NetCDF and projection libraries that are unavailable"
-        )
+def _attribute(obj: Any, name: str, default: Any = None) -> Any:
+    """Return and normalize an HDF5/NetCDF attribute."""
+    if obj is None:
+        return default
+    value = obj.attrs.get(name, default)
+    if hasattr(value, "size") and value.size == 1:
+        value = value.item()
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return value
+
+
+def _variables(dataset: Any) -> Any:
+    """Return the variable mapping for netCDF-like and HDF5 readers."""
+    return getattr(dataset, "variables", dataset)
+
+
+def _dimensions(variable: Any) -> tuple[str, ...]:
+    """Return semantic dimension names from a pyfive dataset."""
+    if dimensions := getattr(variable, "dimensions", None):
+        return tuple(dimensions)
+    result: list[str] = []
+    for index, dimension in enumerate(variable.dims):
+        scales = list(dimension)
+        result.append(scales[0].name.rsplit("/", 1)[-1] if scales else f"dim_{index}")
+    return tuple(result)
 
 
 def _write_temporary_file(data: bytes) -> str:
@@ -150,12 +172,14 @@ class KnmiSharedCache:
 
 def _find_data_variable(dataset: Any) -> Any:
     candidates: list[tuple[int, Any]] = []
-    for name, variable in dataset.variables.items():
+    for name, variable in _variables(dataset).items():
+        if not hasattr(variable, "shape"):
+            continue
         lower = name.lower()
-        standard_name = str(getattr(variable, "standard_name", "")).lower()
-        dimensions = tuple(dimension.lower() for dimension in variable.dimensions)
+        standard_name = str(_attribute(variable, "standard_name", "")).lower()
+        dimensions = tuple(dimension.lower() for dimension in _dimensions(variable))
         identity = f"{lower} {standard_name}"
-        if variable.ndim < 3 or not any(
+        if len(variable.shape) < 3 or not any(
             token in identity for token in ("precip", "rain", "intensity")
         ):
             continue
@@ -177,12 +201,13 @@ def _dimension_index(
     axis: str | None = None,
     standard_names: tuple[str, ...] = (),
 ) -> int | None:
+    variables = _variables(dataset)
     for index, dimension in enumerate(dimensions):
-        coordinate = dataset.variables.get(dimension)
+        coordinate = variables.get(dimension)
         dimension_name = dimension.lower()
-        coordinate_axis = str(getattr(coordinate, "axis", "")).upper()
-        standard_name = str(getattr(coordinate, "standard_name", "")).lower()
-        units = str(getattr(coordinate, "units", "")).lower()
+        coordinate_axis = str(_attribute(coordinate, "axis", "")).upper()
+        standard_name = str(_attribute(coordinate, "standard_name", "")).lower()
+        units = str(_attribute(coordinate, "units", "")).lower()
         if (
             any(token in dimension_name for token in tokens)
             or (axis is not None and coordinate_axis == axis)
@@ -197,9 +222,14 @@ def _nearest_grid_cell(dataset: Any, latitude: float, longitude: float) -> tuple
     import numpy as np
 
     coordinate_tolerance = 1e-4
+    variables = _variables(dataset)
 
-    lat_variable = next((dataset.variables[name] for name in ("lat", "latitude") if name in dataset.variables), None)
-    lon_variable = next((dataset.variables[name] for name in ("lon", "longitude") if name in dataset.variables), None)
+    lat_variable = next(
+        (variables[name] for name in ("lat", "latitude") if name in variables), None
+    )
+    lon_variable = next(
+        (variables[name] for name in ("lon", "longitude") if name in variables), None
+    )
     if lat_variable is not None and lon_variable is not None and lat_variable.ndim == lon_variable.ndim == 1:
         latitudes = np.asarray(lat_variable[:], dtype=float)
         longitudes = np.asarray(lon_variable[:], dtype=float)
@@ -231,40 +261,12 @@ def _nearest_grid_cell(dataset: Any, latitude: float, longitude: float) -> tuple
         flat_index = int(np.nanargmin(distance))
         return tuple(int(value) for value in np.unravel_index(flat_index, distance.shape))  # type: ignore[return-value]
 
-    x_variable = next((dataset.variables[name] for name in ("x", "projection_x_coordinate") if name in dataset.variables), None)
-    y_variable = next((dataset.variables[name] for name in ("y", "projection_y_coordinate") if name in dataset.variables), None)
-    if x_variable is None or y_variable is None:
-        raise ProviderDataError("KNMI file has no supported grid coordinates")
-
-    from pyproj import CRS, Transformer
-
-    grid_mapping = next(
-        (variable for variable in dataset.variables.values() if getattr(variable, "grid_mapping_name", None)),
-        None,
-    )
-    if grid_mapping is not None:
-        target_crs = CRS.from_cf({attribute: getattr(grid_mapping, attribute) for attribute in grid_mapping.ncattrs()})
-    else:
-        target_crs = CRS.from_proj4(
-            "+proj=stere +lat_0=90 +lon_0=0 +lat_ts=60 +a=6378137 +b=6356752 +x_0=0 +y_0=0 +units=km"
-        )
-    x_target, y_target = Transformer.from_crs("EPSG:4326", target_crs, always_xy=True).transform(longitude, latitude)
-    x_values = np.asarray(x_variable[:], dtype=float)
-    y_values = np.asarray(y_variable[:], dtype=float)
-    if "km" in str(getattr(x_variable, "units", "")).lower() and abs(x_target) > 10_000:
-        x_target /= 1000
-        y_target /= 1000
-    if not (
-        min(x_values) <= x_target <= max(x_values)
-        and min(y_values) <= y_target <= max(y_values)
-    ):
-        raise ProviderDataError("Location is outside the KNMI forecast grid")
-    return int(np.nanargmin(abs(y_values - y_target))), int(np.nanargmin(abs(x_values - x_target)))
+    raise ProviderDataError("KNMI file has no supported latitude/longitude grid")
 
 
 def _unit_mode(variable: Any) -> str:
     """Return whether a variable contains intensity or interval amounts."""
-    units = str(getattr(variable, "units", "")).lower().replace(" ", "")
+    units = str(_attribute(variable, "units", "")).lower().replace(" ", "")
     if not units:
         return "intensity"
     if "mm" in units and any(
@@ -278,15 +280,52 @@ def _unit_mode(variable: Any) -> str:
     raise ProviderDataError(f"Unsupported KNMI precipitation unit: {units}")
 
 
-def parse_knmi_file(path: str, latitude: float, longitude: float) -> ForecastData:
-    """Extract one location and the first three hours from a KNMI NetCDF file."""
-    import netCDF4
+def _decode_forecast_times(variable: Any, count: int) -> list[datetime]:
+    """Decode the small CF time subset without a binary NetCDF dependency."""
+    units = str(_attribute(variable, "units", ""))
+    match = re.fullmatch(r"(seconds|minutes|hours) since (.+)", units, re.IGNORECASE)
+    if not match:
+        raise ProviderDataError(f"Unsupported KNMI time unit: {units}")
+    unit, origin_text = match.groups()
+    origin_text = origin_text.strip().replace("Z", "+00:00")
+    try:
+        origin = datetime.fromisoformat(origin_text)
+    except ValueError as err:
+        raise ProviderDataError(f"Unsupported KNMI time origin: {origin_text}") from err
+    if origin.tzinfo is None:
+        origin = origin.replace(tzinfo=UTC)
+    else:
+        origin = origin.astimezone(UTC)
+    seconds_per_unit = {"seconds": 1, "minutes": 60, "hours": 3600}[unit.lower()]
+    return [
+        origin + timedelta(seconds=float(value) * seconds_per_unit)
+        for value in variable[:count]
+    ]
+
+
+def _scaled_values(variable: Any, selection: tuple[Any, ...]) -> Any:
+    """Read a subset and apply NetCDF fill, scale and offset metadata."""
     import numpy as np
 
+    raw = np.asarray(variable[selection])
+    values = raw.astype(float)
+    fill_value = _attribute(variable, "_FillValue")
+    if fill_value is not None:
+        values[raw == fill_value] = np.nan
+    values *= float(_attribute(variable, "scale_factor", 1.0))
+    values += float(_attribute(variable, "add_offset", 0.0))
+    return values
+
+
+def parse_knmi_file(path: str, latitude: float, longitude: float) -> ForecastData:
+    """Extract one location and the first three hours from a KNMI NetCDF file."""
+    import numpy as np
+    import pyfive
+
     try:
-        with netCDF4.Dataset(path, "r") as dataset:
+        with pyfive.File(path, "r") as dataset:
             variable = _find_data_variable(dataset)
-            dimensions = tuple(variable.dimensions)
+            dimensions = _dimensions(variable)
             time_axis = _dimension_index(
                 dataset,
                 dimensions,
@@ -318,14 +357,14 @@ def parse_knmi_file(path: str, latitude: float, longitude: float) -> ForecastDat
                 raise ProviderDataError(f"Unsupported KNMI dimensions: {dimensions}")
             y_index, x_index = _nearest_grid_cell(dataset, latitude, longitude)
 
-            selection: list[Any] = [0] * variable.ndim
+            selection: list[Any] = [0] * len(variable.shape)
             remaining_dimensions: list[str] = []
             for axis, dimension in enumerate(dimensions):
                 if axis == time_axis:
                     selection[axis] = slice(0, 36)
                     remaining_dimensions.append(dimension)
                 elif axis == member_axis:
-                    selection[axis] = slice(None)
+                    selection[axis] = slice(0, 20)
                     remaining_dimensions.append(dimension)
                 elif axis == y_axis:
                     selection[axis] = y_index
@@ -334,30 +373,22 @@ def parse_knmi_file(path: str, latitude: float, longitude: float) -> ForecastDat
                 else:
                     selection[axis] = 0
 
-            values = np.asarray(np.ma.filled(variable[tuple(selection)], np.nan), dtype=float)
+            values = _scaled_values(variable, tuple(selection))
             unit_mode = _unit_mode(variable)
             current_time_axis = remaining_dimensions.index(dimensions[time_axis])
-            values = np.moveaxis(values, current_time_axis, 0)
             if member_axis is not None:
                 current_member_axis = remaining_dimensions.index(dimensions[member_axis])
-                if current_member_axis < current_time_axis:
-                    current_member_axis += 1
-                values = np.moveaxis(values, current_member_axis, 1)
+                values = np.moveaxis(
+                    values, (current_time_axis, current_member_axis), (0, 1)
+                )
             else:
+                values = np.moveaxis(values, current_time_axis, 0)
                 values = values[:, np.newaxis]
 
-            time_variable = dataset.variables.get(dimensions[time_axis])
+            time_variable = _variables(dataset).get(dimensions[time_axis])
             forecast_times: list[datetime] = []
-            if time_variable is not None and hasattr(time_variable, "units"):
-                decoded = netCDF4.num2date(
-                    time_variable[: values.shape[0]],
-                    units=time_variable.units,
-                    calendar=getattr(time_variable, "calendar", "standard"),
-                )
-                for item in decoded:
-                    forecast_times.append(
-                        datetime(item.year, item.month, item.day, item.hour, item.minute, item.second, tzinfo=UTC)
-                    )
+            if time_variable is not None and _attribute(time_variable, "units"):
+                forecast_times = _decode_forecast_times(time_variable, values.shape[0])
             else:
                 base = datetime.now(UTC).replace(second=0, microsecond=0)
                 forecast_times = [base + timedelta(minutes=5 * (index + 1)) for index in range(values.shape[0])]
@@ -416,20 +447,19 @@ class KnmiProvider(PrecipitationProvider):
         latitude: float,
         longitude: float,
         api_key: str,
+        use_anonymous_api_key: bool,
         cache: KnmiSharedCache,
     ) -> None:
         super().__init__(session, latitude, longitude)
-        self._api_key = api_key
+        self._api_key = _select_api_key(api_key, use_anonymous_api_key)
         self._cache = cache
 
     async def async_validate(self) -> None:
-        _require_knmi_dependencies()
         if not self._api_key:
             raise ProviderAuthenticationError("A KNMI API key is required")
         await self._cache.async_validate_key(self._api_key)
 
     async def async_fetch_forecast(self) -> ForecastData:
-        _require_knmi_dependencies()
         if not self._api_key:
             raise ProviderAuthenticationError("A KNMI API key is required")
         path, filename = await self._cache.async_get_path(self._api_key)

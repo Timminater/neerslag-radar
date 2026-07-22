@@ -22,6 +22,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
+    BooleanSelectorConfig,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -36,6 +38,7 @@ from .const import (
     CONF_LONGITUDE,
     CONF_PROVIDER,
     CONF_SCAN_INTERVAL,
+    CONF_USE_ANONYMOUS_API_KEY,
     DEFAULT_REQUEST_TIMEOUT,
     DOMAIN,
     PROVIDERS,
@@ -47,7 +50,6 @@ from .providers.base import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderDataError,
-    ProviderDependencyError,
 )
 
 
@@ -203,32 +205,41 @@ class ProviderSubentryFlow(ConfigSubentryFlow):
                 CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
             }
             if provider_type is ProviderType.KNMI:
-                provider_data[CONF_API_KEY] = user_input[CONF_API_KEY]
-            try:
-                await self._async_validate_provider(provider_type, provider_data)
-            except ProviderAuthenticationError:
-                errors["base"] = "invalid_auth"
-            except ProviderConnectionError:
-                errors["base"] = "cannot_connect"
-            except ProviderDependencyError:
-                errors["base"] = "dependency_missing"
-            except ProviderDataError:
-                errors["base"] = "invalid_data"
-            except Exception:  # noqa: BLE001 - config flows must stay usable
-                errors["base"] = "unknown"
-            else:
-                if self.source == SOURCE_RECONFIGURE:
-                    return self.async_update_reload_and_abort(
-                        self._get_entry(),
-                        self._get_reconfigure_subentry(),
+                use_anonymous = bool(
+                    user_input.get(CONF_USE_ANONYMOUS_API_KEY, False)
+                )
+                api_key = str(user_input.get(CONF_API_KEY, "")).strip()
+                provider_data[CONF_USE_ANONYMOUS_API_KEY] = use_anonymous
+                if use_anonymous:
+                    provider_data.pop(CONF_API_KEY, None)
+                elif api_key:
+                    provider_data[CONF_API_KEY] = api_key
+                else:
+                    errors["base"] = "api_key_required"
+            if not errors:
+                try:
+                    await self._async_validate_provider(provider_type, provider_data)
+                except ProviderAuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except ProviderConnectionError:
+                    errors["base"] = "cannot_connect"
+                except ProviderDataError:
+                    errors["base"] = "invalid_data"
+                except Exception:  # noqa: BLE001 - config flows must stay usable
+                    errors["base"] = "unknown"
+                else:
+                    if self.source == SOURCE_RECONFIGURE:
+                        return self.async_update_reload_and_abort(
+                            self._get_entry(),
+                            self._get_reconfigure_subentry(),
+                            title=definition.title,
+                            data=provider_data,
+                        )
+                    return self.async_create_entry(
                         title=definition.title,
                         data=provider_data,
+                        unique_id=provider_type.value,
                     )
-                return self.async_create_entry(
-                    title=definition.title,
-                    data=provider_data,
-                    unique_id=provider_type.value,
-                )
 
         fields: dict[Any, Any] = {
             vol.Required(
@@ -240,7 +251,13 @@ class ProviderSubentryFlow(ConfigSubentryFlow):
             )
         }
         if provider_type is ProviderType.KNMI:
-            fields[vol.Required(CONF_API_KEY, default=defaults.get(CONF_API_KEY, ""))] = (
+            fields[
+                vol.Optional(
+                    CONF_USE_ANONYMOUS_API_KEY,
+                    default=defaults.get(CONF_USE_ANONYMOUS_API_KEY, False),
+                )
+            ] = BooleanSelector(BooleanSelectorConfig())
+            fields[vol.Optional(CONF_API_KEY, default=defaults.get(CONF_API_KEY, ""))] = (
                 TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
             )
         return self.async_show_form(step_id=step_id, data_schema=vol.Schema(fields), errors=errors)

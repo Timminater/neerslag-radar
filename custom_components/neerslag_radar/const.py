@@ -14,6 +14,7 @@ CONF_LATITUDE = "latitude"
 CONF_LONGITUDE = "longitude"
 CONF_PROVIDER = "provider"
 CONF_API_KEY = "api_key"
+CONF_USE_ANONYMOUS_API_KEY = "use_anonymous_api_key"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 SUBENTRY_TYPE_PROVIDER = "provider"

@@ -71,10 +71,15 @@
         },
         "knmi": {
           "title": "Configure KNMI",
-          "description": "KNMI uses the experimental seamless ensemble dataset. Create a free personal Open Data API key on the KNMI Data Platform.",
+          "description": "KNMI uses the experimental seamless ensemble dataset. Enter a registered key from the [KNMI Open Data API token page](https://developer.dataplatform.knmi.nl/open-data-api#token), or select the shared anonymous key for testing.",
           "data": {
             "api_key": "KNMI Open Data API key",
+            "use_anonymous_api_key": "Use shared anonymous test key",
             "scan_interval": "Update interval (minutes)"
+          },
+          "data_description": {
+            "api_key": "Request a registered key on the [KNMI Open Data API token page](https://developer.dataplatform.knmi.nl/open-data-api#token). Not required when the anonymous option is selected.",
+            "use_anonymous_api_key": "Testing only. This key is shared by all anonymous users, is limited to 50 requests/minute and 3,000 requests/hour in total, and can be exhausted by other users. The included key expires on 1 August 2027."
           }
         },
         "open_meteo": {
@@ -86,16 +91,21 @@
         },
         "reconfigure": {
           "title": "Update precipitation provider",
-          "description": "Update credentials or the provider-safe polling interval. Experimental endpoints can change without notice.",
+          "description": "Update credentials or the provider-safe polling interval. KNMI registered keys are available from the [Open Data API token page](https://developer.dataplatform.knmi.nl/open-data-api#token). Experimental endpoints can change without notice.",
           "data": {
             "api_key": "KNMI Open Data API key",
+            "use_anonymous_api_key": "Use shared anonymous test key",
             "scan_interval": "Update interval (minutes)"
+          },
+          "data_description": {
+            "api_key": "Request a registered key on the [KNMI Open Data API token page](https://developer.dataplatform.knmi.nl/open-data-api#token). Not required when the anonymous option is selected.",
+            "use_anonymous_api_key": "Testing only. This key is shared by all anonymous users, is limited to 50 requests/minute and 3,000 requests/hour in total, and can be exhausted by other users. The included key expires on 1 August 2027."
           }
         }
       },
       "error": {
+        "api_key_required": "Enter a personal API key or select the shared anonymous test key.",
         "cannot_connect": "Unable to connect to the provider.",
-        "dependency_missing": "This provider requires optional binary libraries that Home Assistant could not install. Other providers remain available.",
         "invalid_auth": "The API key was rejected.",
         "invalid_data": "The provider returned an unsupported or invalid response.",
         "unknown": "Unexpected error while validating the provider."

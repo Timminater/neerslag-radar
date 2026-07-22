@@ -71,10 +71,15 @@
         },
         "knmi": {
           "title": "KNMI configureren",
-          "description": "KNMI gebruikt de experimentele seamless-ensembledataset. Maak op het KNMI Data Platform een gratis persoonlijke Open Data API-key.",
+          "description": "KNMI gebruikt de experimentele seamless-ensembledataset. Vul een geregistreerde sleutel in van de [KNMI Open Data API-tokenpagina](https://developer.dataplatform.knmi.nl/open-data-api#token), of kies voor testen de gedeelde anonieme sleutel.",
           "data": {
             "api_key": "KNMI Open Data API-key",
+            "use_anonymous_api_key": "Gedeelde anonieme testsleutel gebruiken",
             "scan_interval": "Update-interval (minuten)"
+          },
+          "data_description": {
+            "api_key": "Vraag een geregistreerde sleutel aan op de [KNMI Open Data API-tokenpagina](https://developer.dataplatform.knmi.nl/open-data-api#token). Niet verplicht als de anonieme optie is geselecteerd.",
+            "use_anonymous_api_key": "Alleen voor testen. Deze sleutel wordt gedeeld door alle anonieme gebruikers, heeft gezamenlijk maximaal 50 verzoeken per minuut en 3.000 per uur en kan door andere gebruikers uitgeput raken. De ingebouwde sleutel verloopt op 1 augustus 2027."
           }
         },
         "open_meteo": {
@@ -86,16 +91,21 @@
         },
         "reconfigure": {
           "title": "Neerslagprovider wijzigen",
-          "description": "Wijzig de credentials of het veilige pollinterval. Experimentele endpoints kunnen zonder aankondiging veranderen.",
+          "description": "Wijzig de credentials of het veilige pollinterval. Geregistreerde KNMI-sleutels zijn verkrijgbaar via de [Open Data API-tokenpagina](https://developer.dataplatform.knmi.nl/open-data-api#token). Experimentele endpoints kunnen zonder aankondiging veranderen.",
           "data": {
             "api_key": "KNMI Open Data API-key",
+            "use_anonymous_api_key": "Gedeelde anonieme testsleutel gebruiken",
             "scan_interval": "Update-interval (minuten)"
+          },
+          "data_description": {
+            "api_key": "Vraag een geregistreerde sleutel aan op de [KNMI Open Data API-tokenpagina](https://developer.dataplatform.knmi.nl/open-data-api#token). Niet verplicht als de anonieme optie is geselecteerd.",
+            "use_anonymous_api_key": "Alleen voor testen. Deze sleutel wordt gedeeld door alle anonieme gebruikers, heeft gezamenlijk maximaal 50 verzoeken per minuut en 3.000 per uur en kan door andere gebruikers uitgeput raken. De ingebouwde sleutel verloopt op 1 augustus 2027."
           }
         }
       },
       "error": {
+        "api_key_required": "Vul een persoonlijke API-key in of selecteer de gedeelde anonieme testsleutel.",
         "cannot_connect": "Kan geen verbinding maken met de provider.",
-        "dependency_missing": "Deze provider vereist optionele binaire bibliotheken die Home Assistant niet kon installeren. De andere providers blijven beschikbaar.",
         "invalid_auth": "De API-key is geweigerd.",
         "invalid_data": "De provider gaf een niet-ondersteund of ongeldig antwoord.",
         "unknown": "Onverwachte fout tijdens het controleren van de provider."
