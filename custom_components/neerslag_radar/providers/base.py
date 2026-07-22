@@ -27,6 +27,10 @@ class ProviderDataError(ProviderError):
     """Provider returned malformed or unsupported data."""
 
 
+class ProviderDependencyError(ProviderError):
+    """Provider requires an optional dependency that is unavailable."""
+
+
 class PrecipitationProvider(ABC):
     """Abstract precipitation provider."""
 

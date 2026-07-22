@@ -7,6 +7,5 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Timminater/neerslag-radar/issues",
-  "requirements": ["netCDF4==1.7.4", "pyproj==3.7.2"],
   "version": "0.2.0"
 }

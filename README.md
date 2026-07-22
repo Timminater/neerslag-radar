@@ -16,6 +16,10 @@ data from another source.
 > This integration is experimental. Buienalarm uses an undocumented endpoint and the
 > KNMI seamless ensemble product is experimental. Either source can change or disappear
 > without notice.
+>
+> KNMI additionally requires optional NetCDF and projection libraries. Some Home Assistant
+> installations cannot install these binary packages. This does not prevent the integration
+> or any of the other providers from loading.
 
 ## Requirements
 

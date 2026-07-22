@@ -95,6 +95,7 @@
       },
       "error": {
         "cannot_connect": "Unable to connect to the provider.",
+        "dependency_missing": "This provider requires optional binary libraries that Home Assistant could not install. Other providers remain available.",
         "invalid_auth": "The API key was rejected.",
         "invalid_data": "The provider returned an unsupported or invalid response.",
         "unknown": "Unexpected error while validating the provider."

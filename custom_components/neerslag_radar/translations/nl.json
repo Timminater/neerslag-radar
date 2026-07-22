@@ -95,6 +95,7 @@
       },
       "error": {
         "cannot_connect": "Kan geen verbinding maken met de provider.",
+        "dependency_missing": "Deze provider vereist optionele binaire bibliotheken die Home Assistant niet kon installeren. De andere providers blijven beschikbaar.",
         "invalid_auth": "De API-key is geweigerd.",
         "invalid_data": "De provider gaf een niet-ondersteund of ongeldig antwoord.",
         "unknown": "Onverwachte fout tijdens het controleren van de provider."

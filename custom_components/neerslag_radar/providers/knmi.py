@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import os
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,7 @@ from .base import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderDataError,
+    ProviderDependencyError,
 )
 from .http import async_get
 
@@ -24,6 +26,20 @@ DATASET = "seamless_precipitation_ensemble_forecast_members"
 VERSION = "1.0"
 BASE_URL = f"https://api.dataplatform.knmi.nl/open-data/v1/datasets/{DATASET}/versions/{VERSION}/files"
 MAX_FILE_SIZE = 750_000_000
+OPTIONAL_DEPENDENCIES = ("netCDF4", "numpy", "pyproj")
+
+
+def knmi_dependencies_available() -> bool:
+    """Return whether the optional KNMI parsing libraries can be imported."""
+    return all(importlib.util.find_spec(module) is not None for module in OPTIONAL_DEPENDENCIES)
+
+
+def _require_knmi_dependencies() -> None:
+    """Fail before downloading a forecast when KNMI parsing is unavailable."""
+    if not knmi_dependencies_available():
+        raise ProviderDependencyError(
+            "KNMI requires optional NetCDF and projection libraries that are unavailable"
+        )
 
 
 def _write_temporary_file(data: bytes) -> str:
@@ -407,11 +423,13 @@ class KnmiProvider(PrecipitationProvider):
         self._cache = cache
 
     async def async_validate(self) -> None:
+        _require_knmi_dependencies()
         if not self._api_key:
             raise ProviderAuthenticationError("A KNMI API key is required")
         await self._cache.async_validate_key(self._api_key)
 
     async def async_fetch_forecast(self) -> ForecastData:
+        _require_knmi_dependencies()
         if not self._api_key:
             raise ProviderAuthenticationError("A KNMI API key is required")
         path, filename = await self._cache.async_get_path(self._api_key)

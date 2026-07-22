@@ -47,6 +47,7 @@ from .providers.base import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderDataError,
+    ProviderDependencyError,
 )
 
 
@@ -209,6 +210,8 @@ class ProviderSubentryFlow(ConfigSubentryFlow):
                 errors["base"] = "invalid_auth"
             except ProviderConnectionError:
                 errors["base"] = "cannot_connect"
+            except ProviderDependencyError:
+                errors["base"] = "dependency_missing"
             except ProviderDataError:
                 errors["base"] = "invalid_data"
             except Exception:  # noqa: BLE001 - config flows must stay usable
