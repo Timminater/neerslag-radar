@@ -7,6 +7,15 @@ on:
     paths:
       - custom_components/neerslag_radar/manifest.json
   workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release; must match manifest.json
+        required: false
+        type: string
+      target:
+        description: Commit or tag to release; defaults to the current commit
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -20,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.2"
@@ -43,6 +54,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target || github.sha }}
       - uses: hacs/action@main
         with:
           category: integration
@@ -51,6 +64,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target || github.sha }}
       - uses: home-assistant/actions/hassfest@master
 
   release:
@@ -65,21 +80,31 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.target || github.sha }}
 
       - name: Read and validate version
         id: manifest
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
-          version="$(python -c 'import json; print(json.load(open("custom_components/neerslag_radar/manifest.json"))["version"])')"
+          manifest_version="$(python -c 'import json; print(json.load(open("custom_components/neerslag_radar/manifest.json"))["version"])')"
+          version="${REQUESTED_VERSION:-$manifest_version}"
+          if [[ "$version" != "$manifest_version" ]]; then
+            echo "Requested version $version does not match manifest.json version $manifest_version." >&2
+            exit 1
+          fi
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Invalid semantic version in manifest.json: $version" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "target=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ steps.manifest.outputs.target }}
           VERSION: ${{ steps.manifest.outputs.version }}
         shell: bash
         run: |
@@ -90,8 +115,8 @@ jobs:
 
           if git rev-parse --verify --quiet "refs/tags/$VERSION" >/dev/null; then
             tag_commit="$(git rev-list -n 1 "$VERSION")"
-            if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
-              echo "Tag $VERSION points to $tag_commit instead of $GITHUB_SHA." >&2
+            if [[ "$tag_commit" != "$TARGET" ]]; then
+              echo "Tag $VERSION points to $tag_commit instead of $TARGET." >&2
               exit 1
             fi
           fi
@@ -99,7 +124,7 @@ jobs:
           release_args=(
             "$VERSION"
             --repo "$GITHUB_REPOSITORY"
-            --target "$GITHUB_SHA"
+            --target "$TARGET"
             --title "$VERSION"
             --generate-notes
           )
