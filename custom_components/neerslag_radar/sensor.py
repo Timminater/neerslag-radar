@@ -16,7 +16,7 @@ from .aggregation import GLOBAL_SLOT_COUNT
 from .const import CONF_PROVIDER, DOMAIN, PROVIDERS, ProviderType
 from .coordinator import PrecipitationCoordinator
 from .global_coordinator import GlobalPrecipitationCoordinator
-from .models import ForecastPoint
+from .models import ForecastPoint, format_forecast_interval
 
 
 async def async_setup_entry(
@@ -135,6 +135,18 @@ class PrecipitationSlotSensor(PrecipitationSensorBase):
         self._attr_translation_placeholders = {"slot": str(slot + 1)}
 
     @property
+    def name(self) -> str | None:
+        """Return the local forecast interval as the visible entity name."""
+        if (point := self._point) is not None:
+            return format_forecast_interval(point, self.hass.config.time_zone)
+        return super().name
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Keep entity ID generation independent of the dynamic name."""
+        return f"forecast_slot_{self._slot + 1}"
+
+    @property
     def available(self) -> bool:
         """Return availability for this specific slot."""
         return super().available and self._point is not None
@@ -241,6 +253,18 @@ class GlobalSlotSensor(GlobalSensorBase):
         self._attr_unique_id = f"{entry.entry_id}_global_slot_{slot + 1}"
         self._attr_translation_key = "forecast_slot"
         self._attr_translation_placeholders = {"slot": str(slot + 1)}
+
+    @property
+    def name(self) -> str | None:
+        """Return the local forecast interval as the visible entity name."""
+        if (point := self._point) is not None:
+            return format_forecast_interval(point, self.hass.config.time_zone)
+        return super().name
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Keep entity ID generation independent of the dynamic name."""
+        return f"forecast_slot_{self._slot + 1}"
 
     @property
     def available(self) -> bool:

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,13 @@ class ForecastPoint:
                 for provider, value in self.provider_values.items()
             }
         return result
+
+
+def format_forecast_interval(point: ForecastPoint, time_zone: str) -> str:
+    """Format a forecast point as a local start and end time."""
+    start = point.forecast_time.astimezone(ZoneInfo(time_zone))
+    end = start + timedelta(minutes=point.interval_minutes)
+    return f"{start:%H:%M}–{end:%H:%M}"
 
 
 @dataclass(frozen=True, slots=True)
