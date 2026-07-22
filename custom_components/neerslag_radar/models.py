@@ -19,6 +19,7 @@ class ForecastPoint:
     uncertainty_mm: float | None = None
     precipitation_type: str | None = None
     source: str | None = None
+    provider_values: dict[str, float] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Return a compact Home Assistant attribute representation."""
@@ -34,6 +35,14 @@ class ForecastPoint:
             result["uncertainty"] = round(self.uncertainty_mm, 3)
         if self.precipitation_type is not None:
             result["precipitation_type"] = self.precipitation_type
+        if self.source is not None:
+            result["source"] = self.source
+        if self.provider_values is not None:
+            result["selected_provider"] = self.source
+            result["provider_values"] = {
+                provider: round(value, 3)
+                for provider, value in self.provider_values.items()
+            }
         return result
 
 

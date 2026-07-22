@@ -12,8 +12,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import PrecipitationConfigEntry
+from .aggregation import GLOBAL_SLOT_COUNT
 from .const import CONF_PROVIDER, DOMAIN, PROVIDERS, ProviderType
 from .coordinator import PrecipitationCoordinator
+from .global_coordinator import GlobalPrecipitationCoordinator
 from .models import ForecastPoint
 
 
@@ -34,6 +36,16 @@ async def async_setup_entry(
             for slot in range(PROVIDERS[provider_type].slot_count)
         )
         async_add_entities(entities, config_subentry_id=subentry_id)
+
+    if global_coordinator := entry.runtime_data.global_coordinator:
+        global_entities: list[SensorEntity] = [
+            GlobalOverviewSensor(entry, global_coordinator)
+        ]
+        global_entities.extend(
+            GlobalSlotSensor(entry, global_coordinator, slot)
+            for slot in range(GLOBAL_SLOT_COUNT)
+        )
+        async_add_entities(global_entities)
 
 
 class PrecipitationSensorBase(CoordinatorEntity[PrecipitationCoordinator], SensorEntity):
@@ -141,6 +153,114 @@ class PrecipitationSlotSensor(PrecipitationSensorBase):
             return {"provider": self._provider_type.value, "slot": self._slot + 1}
         result = point.as_dict()
         result.update({"provider": self._provider_type.value, "slot": self._slot + 1})
+        return result
+
+    @property
+    def _point(self) -> ForecastPoint | None:
+        data = self.coordinator.data
+        if data is None or self._slot >= len(data.points):
+            return None
+        return data.points[self._slot]
+
+
+class GlobalSensorBase(
+    CoordinatorEntity[GlobalPrecipitationCoordinator], SensorEntity
+):
+    """Base class for calculated Global forecast sensors."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.PRECIPITATION
+    _attr_native_unit_of_measurement = UnitOfPrecipitationDepth.MILLIMETERS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+    _attr_attribution = "Maximum of configured precipitation forecast providers"
+
+    def __init__(
+        self,
+        entry: PrecipitationConfigEntry,
+        coordinator: GlobalPrecipitationCoordinator,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_global")},
+            name=f"{entry.title} Global",
+            manufacturer="Neerslag Radar",
+            model="Maximum provider forecast",
+        )
+
+
+class GlobalOverviewSensor(GlobalSensorBase):
+    """Total maximum precipitation over the Global forecast horizon."""
+
+    _unrecorded_attributes = frozenset({"forecast"})
+
+    def __init__(
+        self,
+        entry: PrecipitationConfigEntry,
+        coordinator: GlobalPrecipitationCoordinator,
+    ) -> None:
+        super().__init__(entry, coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_global_total"
+        self._attr_translation_key = "forecast_total"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the sum of all maximum five-minute slots."""
+        if self.coordinator.data is None:
+            return None
+        return round(self.coordinator.data.total_precipitation_mm, 3)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the complete Global forecast."""
+        if self.coordinator.data is None:
+            return {}
+        points = self.coordinator.data.points
+        return {
+            "provider": "global",
+            "aggregation": "maximum",
+            "forecast": [point.as_dict() for point in points],
+            "forecast_start": points[0].forecast_time.isoformat() if points else None,
+            "forecast_end": points[-1].forecast_time.isoformat() if points else None,
+            "point_count": len(points),
+            "providers": self.coordinator.data.metadata.get("providers", []),
+        }
+
+
+class GlobalSlotSensor(GlobalSensorBase):
+    """One calculated five-minute Global forecast slot."""
+
+    def __init__(
+        self,
+        entry: PrecipitationConfigEntry,
+        coordinator: GlobalPrecipitationCoordinator,
+        slot: int,
+    ) -> None:
+        super().__init__(entry, coordinator)
+        self._slot = slot
+        self._attr_unique_id = f"{entry.entry_id}_global_slot_{slot + 1}"
+        self._attr_translation_key = "forecast_slot"
+        self._attr_translation_placeholders = {"slot": str(slot + 1)}
+
+    @property
+    def available(self) -> bool:
+        """Return availability for this Global slot."""
+        return super().available and self._point is not None
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the maximum expected precipitation for this slot."""
+        point = self._point
+        return round(point.precipitation_mm, 3) if point else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the provider comparison for this slot."""
+        point = self._point
+        if point is None:
+            return {"provider": "global", "slot": self._slot + 1}
+        result = point.as_dict()
+        result.update({"provider": "global", "slot": self._slot + 1})
         return result
 
     @property

@@ -13,7 +13,7 @@ can have one subentry per provider, so a failing provider does not replace or co
 data from another source.
 
 > [!IMPORTANT]
-> This is an initial `0.1.0` release. Buienalarm uses an undocumented endpoint and the
+> This is an experimental `0.2.0` release. Buienalarm uses an undocumented endpoint and the
 > KNMI seamless ensemble product is experimental. Either source can change or disappear
 > without notice.
 
@@ -72,6 +72,16 @@ Slot attributes include:
 - `precipitation_intensity`: equivalent `mm/h`
 - `probability` and `uncertainty`: available for KNMI ensemble points
 - `provider` and `slot`
+
+The integration also creates a **Global** device whenever at least one provider is
+configured. It exposes 36 five-minute slots and a total sensor. Provider amounts are
+first distributed proportionally over matching five-minute intervals; each Global slot
+then uses the highest available provider amount. Its attributes include
+`selected_provider` and `provider_values`, so the chosen source remains transparent.
+
+A Global slot stays available while at least one provider has a current forecast. The
+Global total is a conservative maximum envelope and can therefore combine different
+providers across its three-hour horizon.
 
 Providers are never blended and missing horizons are never extrapolated. A provider
 update failure marks only that provider's entities unavailable; the coordinator keeps

@@ -21,6 +21,7 @@ from .const import (
     ProviderType,
 )
 from .coordinator import PrecipitationCoordinator
+from .global_coordinator import GlobalPrecipitationCoordinator
 from .providers import KnmiSharedCache, create_provider
 
 CACHE_KEY = "knmi_cache"
@@ -34,6 +35,7 @@ class PrecipitationRuntimeData:
     coordinators: dict[str, PrecipitationCoordinator]
     subentries: dict[str, ConfigSubentry]
     knmi_cache: KnmiSharedCache
+    global_coordinator: GlobalPrecipitationCoordinator | None
 
 
 PrecipitationConfigEntry = ConfigEntry[PrecipitationRuntimeData]
@@ -75,12 +77,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: PrecipitationConfigEntry
         coordinators[subentry.subentry_id] = coordinator
         provider_subentries[subentry.subentry_id] = subentry
 
-    entry.runtime_data = PrecipitationRuntimeData(coordinators, provider_subentries, knmi_cache)
+    global_coordinator = (
+        GlobalPrecipitationCoordinator(hass, entry, coordinators) if coordinators else None
+    )
+    entry.runtime_data = PrecipitationRuntimeData(
+        coordinators, provider_subentries, knmi_cache, global_coordinator
+    )
     if coordinators:
         await asyncio.gather(
             *(coordinator.async_refresh() for coordinator in coordinators.values()),
             return_exceptions=True,
         )
+    if global_coordinator:
+        global_coordinator.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -89,6 +98,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: PrecipitationConfigEntr
     """Unload a location config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        if entry.runtime_data.global_coordinator:
+            entry.runtime_data.global_coordinator.async_stop()
         domain_data = hass.data[DOMAIN]
         domain_data[CACHE_USERS_KEY] = max(0, int(domain_data[CACHE_USERS_KEY]) - 1)
         if domain_data[CACHE_USERS_KEY] == 0:
