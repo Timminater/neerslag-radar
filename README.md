@@ -13,7 +13,7 @@ can have one subentry per provider, so a failing provider does not replace or co
 data from another source.
 
 > [!IMPORTANT]
-> This is an experimental `0.2.0` release. Buienalarm uses an undocumented endpoint and the
+> This integration is experimental. Buienalarm uses an undocumented endpoint and the
 > KNMI seamless ensemble product is experimental. Either source can change or disappear
 > without notice.
 

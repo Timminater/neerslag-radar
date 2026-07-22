@@ -5,7 +5,9 @@ on:
     branches:
       - main
     paths:
-      - custom_components/neerslag_radar/manifest.json
+      - brand/**
+      - custom_components/**
+      - hacs.json
   workflow_dispatch:
     inputs:
       version:
@@ -103,16 +105,57 @@ jobs:
 
       - name: Publish GitHub release
         env:
+          EVENT_NAME: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
           TARGET: ${{ steps.manifest.outputs.target }}
           VERSION: ${{ steps.manifest.outputs.version }}
         shell: bash
         run: |
           if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $VERSION already exists; nothing to publish."
-            exit 0
+            if [[ "$EVENT_NAME" != "push" ]]; then
+              echo "Release $VERSION already exists; nothing to publish."
+              exit 0
+            fi
+
+            if [[ "$VERSION" == *-* || "$VERSION" == *+* ]]; then
+              echo "Automatic patch bumps require a stable semantic version, got $VERSION." >&2
+              exit 1
+            fi
+
+            next_version="$(python -c 'import os; major, minor, patch = map(int, os.environ["VERSION"].split(".")); print(f"{major}.{minor}.{patch + 1}")')"
+            if gh release view "$next_version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release $next_version already exists; nothing to publish."
+              exit 0
+            fi
+
+            VERSION="$next_version"
+            export VERSION
+            python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("custom_components/neerslag_radar/manifest.json")
+          text = path.read_text(encoding="utf-8")
+          updated, count = re.subn(
+              r'("version"\s*:\s*")[^"]+(")',
+              rf'\g<1>{os.environ["VERSION"]}\2',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update exactly one manifest version")
+          path.write_text(updated, encoding="utf-8")
+          PY
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add custom_components/neerslag_radar/manifest.json
+            git commit -m "Bump version to $VERSION [skip ci]"
+            git push origin HEAD:main
+            TARGET="$(git rev-parse HEAD)"
           fi
 
+          git fetch --tags --force
           tag_exists=false
           if git rev-parse --verify --quiet "refs/tags/$VERSION" >/dev/null; then
             tag_exists=true
@@ -123,15 +166,17 @@ jobs:
             fi
           fi
 
+          if [[ "$tag_exists" == false ]]; then
+            git tag "$VERSION" "$TARGET"
+            git push origin "refs/tags/$VERSION"
+          fi
+
           release_args=(
             "$VERSION"
             --repo "$GITHUB_REPOSITORY"
             --title "$VERSION"
             --generate-notes
           )
-          if [[ "$tag_exists" == false ]]; then
-            release_args+=(--target "$TARGET")
-          fi
           if [[ "$VERSION" == *-* ]]; then
             release_args+=(--prerelease)
           fi
