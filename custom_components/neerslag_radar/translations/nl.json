@@ -1,0 +1,105 @@
+{
+  "title": "Neerslag Radar",
+  "entity": {
+    "sensor": {
+      "forecast_total": {
+        "name": "Verwachting totaal"
+      },
+      "forecast_slot": {
+        "name": "Verwachtingsslot {slot}"
+      }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Voorspellingslocatie toevoegen",
+        "description": "Maak een vaste locatie. Daarna kun je één of meer neerslagproviders toevoegen.",
+        "data": {
+          "name": "Locatienaam",
+          "latitude": "Breedtegraad",
+          "longitude": "Lengtegraad"
+        },
+        "data_description": {
+          "latitude": "Standaard wordt de breedtegraad van Home Assistant gebruikt.",
+          "longitude": "Standaard wordt de lengtegraad van Home Assistant gebruikt."
+        }
+      },
+      "reconfigure": {
+        "title": "Voorspellingslocatie wijzigen",
+        "description": "Gewijzigde coördinaten gelden voor alle providers van deze locatie.",
+        "data": {
+          "name": "Locatienaam",
+          "latitude": "Breedtegraad",
+          "longitude": "Lengtegraad"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Deze locatie is al geconfigureerd.",
+      "unique_id_mismatch": "De locatie komt niet overeen met de entry die wordt gewijzigd."
+    }
+  },
+  "config_subentries": {
+    "provider": {
+      "title": "Neerslagprovider",
+      "step": {
+        "user": {
+          "title": "Neerslagprovider toevoegen",
+          "description": "Kies de databron voor deze locatie.",
+          "data": {
+            "provider": "Provider"
+          }
+        },
+        "buienradar": {
+          "title": "Buienradar configureren",
+          "description": "Buienradar levert normaal ongeveer twee uur aan voorspellingen per vijf minuten.",
+          "data": {
+            "scan_interval": "Update-interval (minuten)"
+          }
+        },
+        "buienalarm": {
+          "title": "Buienalarm configureren",
+          "description": "Waarschuwing: deze provider gebruikt een ongedocumenteerd endpoint. Dit kan zonder aankondiging veranderen, toegang blokkeren of stoppen.",
+          "data": {
+            "scan_interval": "Update-interval (minuten)"
+          }
+        },
+        "knmi": {
+          "title": "KNMI configureren",
+          "description": "KNMI gebruikt de experimentele seamless-ensembledataset. Maak op het KNMI Data Platform een gratis persoonlijke Open Data API-key.",
+          "data": {
+            "api_key": "KNMI Open Data API-key",
+            "scan_interval": "Update-interval (minuten)"
+          }
+        },
+        "open_meteo": {
+          "title": "Open-Meteo configureren",
+          "description": "De gratis API is bedoeld voor niet-commercieel gebruik en vereist bronvermelding.",
+          "data": {
+            "scan_interval": "Update-interval (minuten)"
+          }
+        },
+        "reconfigure": {
+          "title": "Neerslagprovider wijzigen",
+          "description": "Wijzig de credentials of het veilige pollinterval. Experimentele endpoints kunnen zonder aankondiging veranderen.",
+          "data": {
+            "api_key": "KNMI Open Data API-key",
+            "scan_interval": "Update-interval (minuten)"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Kan geen verbinding maken met de provider.",
+        "invalid_auth": "De API-key is geweigerd.",
+        "invalid_data": "De provider gaf een niet-ondersteund of ongeldig antwoord.",
+        "unknown": "Onverwachte fout tijdens het controleren van de provider."
+      },
+      "abort": {
+        "all_providers_configured": "Alle ondersteunde providers zijn al aan deze locatie toegevoegd.",
+        "reconfigure_successful": "De providerconfiguratie is bijgewerkt.",
+        "unknown": "De gekozen provider is verloren gegaan."
+      }
+    }
+  }
+}

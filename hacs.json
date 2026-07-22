@@ -1,0 +1,5 @@
+{
+  "name": "Neerslag Radar",
+  "country": ["BE", "NL"],
+  "homeassistant": "2026.6.0"
+}

@@ -1,0 +1,105 @@
+{
+  "title": "Neerslag Radar",
+  "entity": {
+    "sensor": {
+      "forecast_total": {
+        "name": "Forecast total"
+      },
+      "forecast_slot": {
+        "name": "Forecast slot {slot}"
+      }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add forecast location",
+        "description": "Create a fixed location. You can add one or more precipitation providers afterwards.",
+        "data": {
+          "name": "Location name",
+          "latitude": "Latitude",
+          "longitude": "Longitude"
+        },
+        "data_description": {
+          "latitude": "Defaults to the Home Assistant home latitude.",
+          "longitude": "Defaults to the Home Assistant home longitude."
+        }
+      },
+      "reconfigure": {
+        "title": "Update forecast location",
+        "description": "Changing the coordinates updates every provider configured for this location.",
+        "data": {
+          "name": "Location name",
+          "latitude": "Latitude",
+          "longitude": "Longitude"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This location is already configured.",
+      "unique_id_mismatch": "The location identity does not match the entry being reconfigured."
+    }
+  },
+  "config_subentries": {
+    "provider": {
+      "title": "Precipitation provider",
+      "step": {
+        "user": {
+          "title": "Add precipitation provider",
+          "description": "Choose the source for this location.",
+          "data": {
+            "provider": "Provider"
+          }
+        },
+        "buienradar": {
+          "title": "Configure Buienradar",
+          "description": "Buienradar normally supplies approximately two hours of five-minute forecasts.",
+          "data": {
+            "scan_interval": "Update interval (minutes)"
+          }
+        },
+        "buienalarm": {
+          "title": "Configure Buienalarm",
+          "description": "Warning: this provider uses an undocumented endpoint. It can change, block access or stop working without notice.",
+          "data": {
+            "scan_interval": "Update interval (minutes)"
+          }
+        },
+        "knmi": {
+          "title": "Configure KNMI",
+          "description": "KNMI uses the experimental seamless ensemble dataset. Create a free personal Open Data API key on the KNMI Data Platform.",
+          "data": {
+            "api_key": "KNMI Open Data API key",
+            "scan_interval": "Update interval (minutes)"
+          }
+        },
+        "open_meteo": {
+          "title": "Configure Open-Meteo",
+          "description": "The free API is intended for non-commercial use and requires attribution.",
+          "data": {
+            "scan_interval": "Update interval (minutes)"
+          }
+        },
+        "reconfigure": {
+          "title": "Update precipitation provider",
+          "description": "Update credentials or the provider-safe polling interval. Experimental endpoints can change without notice.",
+          "data": {
+            "api_key": "KNMI Open Data API key",
+            "scan_interval": "Update interval (minutes)"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Unable to connect to the provider.",
+        "invalid_auth": "The API key was rejected.",
+        "invalid_data": "The provider returned an unsupported or invalid response.",
+        "unknown": "Unexpected error while validating the provider."
+      },
+      "abort": {
+        "all_providers_configured": "All supported providers are already configured for this location.",
+        "reconfigure_successful": "Provider configuration updated successfully.",
+        "unknown": "The provider flow lost its selected provider."
+      }
+    }
+  }
+}
