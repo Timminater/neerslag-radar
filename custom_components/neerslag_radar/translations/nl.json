@@ -1,5 +1,4 @@
 {
-  "title": "Neerslag Radar",
   "entity": {
     "sensor": {
       "forecast_total": {
@@ -42,6 +41,11 @@
   },
   "config_subentries": {
     "provider": {
+      "entry_type": "Neerslagprovider",
+      "initiate_flow": {
+        "user": "Neerslagprovider toevoegen",
+        "reconfigure": "Neerslagprovider wijzigen"
+      },
       "title": "Neerslagprovider",
       "step": {
         "user": {

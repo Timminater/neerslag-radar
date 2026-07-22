@@ -1,5 +1,4 @@
 {
-  "title": "Neerslag Radar",
   "entity": {
     "sensor": {
       "forecast_total": {
@@ -42,6 +41,11 @@
   },
   "config_subentries": {
     "provider": {
+      "entry_type": "Precipitation provider",
+      "initiate_flow": {
+        "user": "Add precipitation provider",
+        "reconfigure": "Reconfigure precipitation provider"
+      },
       "title": "Precipitation provider",
       "step": {
         "user": {
