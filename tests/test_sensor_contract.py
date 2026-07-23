@@ -8,7 +8,6 @@ from types import SimpleNamespace
 
 import pytest
 
-
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("homeassistant") is None,
     reason="Home Assistant is required for entity tests",
