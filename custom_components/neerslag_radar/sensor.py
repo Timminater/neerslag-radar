@@ -110,6 +110,9 @@ class PrecipitationOverviewSensor(PrecipitationSensorBase):
         points = self.coordinator.data.points
         return {
             "provider": self._provider_type.value,
+            "location_id": self._entry.entry_id,
+            "location_name": self._entry.title,
+            "forecast_schema_version": 1,
             "forecast": [point.as_dict() for point in points],
             "forecast_start": points[0].forecast_time.isoformat() if points else None,
             "forecast_end": points[-1].forecast_time.isoformat() if points else None,

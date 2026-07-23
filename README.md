@@ -97,6 +97,15 @@ Providers are never blended and missing horizons are never extrapolated. A provi
 update failure marks only that provider's entities unavailable; the coordinator keeps
 the last valid response internally and publishes new data after recovery.
 
+## Lovelace card compatibility
+
+Version 0.3.0 and newer is compatible with
+[Timminater/neerslag-radar-card](https://github.com/Timminater/neerslag-radar-card).
+The card automatically finds provider forecast-total sensors for configured locations;
+the calculated **Global** sensor is deliberately excluded. Each recognised sensor
+exposes a stable location identifier, location name and forecast schema version in its
+attributes.
+
 ## Example automation
 
 Use a native numeric-state trigger on an upcoming slot:
